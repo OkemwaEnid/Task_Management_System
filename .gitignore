@@ -1,0 +1,7 @@
+# Ignore sensitive files
+includes/config.php
+task_manager.sql
+# Ignore PHPMailer (optional, as it’s a third-party library)
+includes/PHPMailer/
+# Ignore temporary files and logs
+*.log
