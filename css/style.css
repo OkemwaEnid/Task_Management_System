@@ -14,6 +14,7 @@ h3 {
   color: #1e3a8a;
   font-weight: 700;
   margin-bottom: 20px;
+  text-align: center;
 }
 
 h2 {
@@ -108,6 +109,14 @@ a {
   text-decoration: none;
   font-weight: 500;
   transition: color 0.3s ease;
+  text-align: center;
+}
+
+.center-link {
+  display: block;
+  width: 200px;
+  margin: 20px auto;
+  text-align: center;
 }
 
 a:hover {

@@ -37,7 +37,7 @@ $tasks = $conn->query("SELECT t.*, u.username FROM tasks t JOIN users u ON t.ass
 <head>
     <meta charset="UTF-8">
     <title>Manage Tasks</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
     <h2>Manage Tasks</h2>
@@ -69,6 +69,6 @@ $tasks = $conn->query("SELECT t.*, u.username FROM tasks t JOIN users u ON t.ass
         </tr>
         <?php endforeach; ?>
     </table>
-    <a href="dashboard.php">Back to Dashboard</a>
+    <a href="dashboard.php" class="center-link">Back to Dashboard</a>
 </body>
 </html>
