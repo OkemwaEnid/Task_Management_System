@@ -78,9 +78,21 @@ button:hover {
   transform: translateY(-2px);
 }
 
+button[name="delete_user"] {
+  background-color: #dc2626;
+  padding: 5px 10px;
+  display: inline-block;
+  margin: 0 5px;
+}
+
+button[name="delete_user"]:hover {
+  background-color: #b91c1c;
+  transform: translateY(-2px);
+}
+
 table {
   width: 100%;
-  max-width: 1000px; /* Increased for extra columns */
+  max-width: 1000px;
   margin: 20px auto;
   border-collapse: collapse;
   background: white;
@@ -92,7 +104,7 @@ table {
 th,
 td {
   padding: 12px;
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -100,10 +112,6 @@ th {
   background-color: #1e3a8a;
   color: white;
   font-weight: 500;
-}
-
-td {
-  text-align: center; /* Center content for better readability */
 }
 
 tr:hover {
@@ -139,35 +147,54 @@ a:hover {
   transform: translateY(-2px);
 }
 
-.action-links a {
-  margin: 0 5px;
+.action-links a,
+.action-links button {
+  margin: 0 20px;
   padding: 5px 10px;
   border-radius: 4px;
   background-color: #e5e7eb;
   color: #333;
+  display: inline-block;
+  text-decoration: none;
+  font-size: 0.9rem;
 }
 
-.action-links a.delete {
+.action-links a.delete,
+.action-links button.delete {
   background-color: #dc2626;
   color: white;
 }
 
-.action-links a:hover {
+.action-links a:hover,
+.action-links button:hover {
   background-color: #d1d5db;
 }
 
-.action-links a.delete:hover {
+.action-links a.delete:hover,
+.action-links button.delete:hover {
   background-color: #b91c1c;
 }
 
+.action-links form {
+  display: inline-block;
+  margin: 0;
+}
+
 .container {
-  max-width: 1000px; /* Match table width */
+  max-width: 1000px;
   margin: 0 auto;
   text-align: center;
 }
 
 .error {
   color: #dc2626;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.success {
+  color: #2ecc71;
   margin-bottom: 15px;
   font-size: 0.9rem;
   text-align: center;
@@ -183,5 +210,13 @@ a:hover {
   }
   .container {
     padding: 10px;
+  }
+  form {
+    padding: 15px;
+  }
+  .action-links a,
+  .action-links button {
+    padding: 4px 8px;
+    font-size: 0.8rem;
   }
 }
