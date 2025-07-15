@@ -19,7 +19,6 @@ h3 {
 
 h2 {
   font-size: 2rem;
-  text-align: center;
 }
 
 h3 {
@@ -44,6 +43,7 @@ textarea {
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 1rem;
+  box-sizing: border-box;
   transition: border-color 0.3s ease;
 }
 
@@ -69,6 +69,8 @@ button {
   font-size: 1rem;
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
+  display: block;
+  margin: 10px auto;
 }
 
 button:hover {
@@ -78,7 +80,7 @@ button:hover {
 
 table {
   width: 100%;
-  max-width: 800px;
+  max-width: 1000px; /* Increased for extra columns */
   margin: 20px auto;
   border-collapse: collapse;
   background: white;
@@ -100,6 +102,10 @@ th {
   font-weight: 500;
 }
 
+td {
+  text-align: center; /* Center content for better readability */
+}
+
 tr:hover {
   background-color: #f9fafb;
 }
@@ -109,14 +115,6 @@ a {
   text-decoration: none;
   font-weight: 500;
   transition: color 0.3s ease;
-  text-align: center;
-}
-
-.center-link {
-  display: block;
-  width: 200px;
-  margin: 20px auto;
-  text-align: center;
 }
 
 a:hover {
@@ -124,8 +122,46 @@ a:hover {
   text-decoration: underline;
 }
 
+.center-link {
+  display: block;
+  width: fit-content;
+  margin: 20px auto;
+  text-align: center;
+  padding: 10px 20px;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 6px;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.center-link:hover {
+  background-color: #2563eb;
+  transform: translateY(-2px);
+}
+
+.action-links a {
+  margin: 0 5px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  background-color: #e5e7eb;
+  color: #333;
+}
+
+.action-links a.delete {
+  background-color: #dc2626;
+  color: white;
+}
+
+.action-links a:hover {
+  background-color: #d1d5db;
+}
+
+.action-links a.delete:hover {
+  background-color: #b91c1c;
+}
+
 .container {
-  max-width: 900px;
+  max-width: 1000px; /* Match table width */
   margin: 0 auto;
   text-align: center;
 }
@@ -134,4 +170,18 @@ a:hover {
   color: #dc2626;
   margin-bottom: 15px;
   font-size: 0.9rem;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  table {
+    font-size: 0.9rem;
+  }
+  th,
+  td {
+    padding: 8px;
+  }
+  .container {
+    padding: 10px;
+  }
 }
