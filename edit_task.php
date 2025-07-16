@@ -1,176 +1,153 @@
 <?php
 session_start();
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+require_once 'includes/config.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    $_SESSION['error'] = "Access denied. Admins only.";
     header("Location: login.php");
     exit;
 }
 
-// Check for config.php
-if (!file_exists('includes/config.php')) {
-    die("Error: includes/config.php not found.");
-}
-require_once 'includes/config.php';
-
-// Check for PHPMailer (only on live server)
-$is_local = (isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST'] === 'localhost');
-if (!$is_local) {
-    $phpmailer_files = ['includes/PHPMailer/src/PHPMailer.php', 'includes/PHPMailer/src/SMTP.php', 'includes/PHPMailer/src/Exception.php'];
-    foreach ($phpmailer_files as $file) {
-        if (!file_exists($file)) {
-            die("Error: $file not found.");
-        }
-    }
-    require_once 'includes/PHPMailer/src/PHPMailer.php';
-    require_once 'includes/PHPMailer/src/SMTP.php';
-    require_once 'includes/PHPMailer/src/Exception.php';
-}
-
-// Connect to DB
 $db = new Database();
 $conn = $db->connect();
-if (!$conn) {
-    die("Error: Database connection failed.");
-}
 
-// Get task ID
-$task_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if ($task_id <= 0) {
+$error = '';
+$success = '';
+$task = null;
+
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     $_SESSION['error'] = "Invalid task ID.";
     header("Location: dashboard.php");
     exit;
 }
 
-// Fetch task details
-$task_stmt = $conn->prepare("SELECT * FROM tasks WHERE id = ?");
-$task_stmt->execute([$task_id]);
-$task = $task_stmt->fetch(PDO::FETCH_ASSOC);
-
+$task_id = $_GET['id'];
+$stmt = $conn->prepare("SELECT * FROM tasks WHERE id = ?");
+$stmt->execute([$task_id]);
+$task = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$task) {
     $_SESSION['error'] = "Task not found.";
     header("Location: dashboard.php");
     exit;
 }
 
-// Fetch users
-$users_stmt = $conn->query("SELECT id, username FROM users WHERE role = 'user'");
-$users = $users_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Handle form submission
-$error = '';
-$success = '';
+$users = $conn->query("SELECT id, username FROM users")->fetchAll(PDO::FETCH_ASSOC);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $title = trim($_POST['title']);
     $description = trim($_POST['description']);
-    $assigned_to = (int)$_POST['assigned_to'];
     $status = $_POST['status'];
     $deadline = $_POST['deadline'];
+    $assigned_to = $_POST['assigned_to'];
+    $original_assigned_to = $task['assigned_to'];
 
-    if (empty($title) || !in_array($status, ['Pending', 'In Progress', 'Completed']) || $assigned_to <= 0) {
-        $error = "Invalid input. Please check the title, status, or assigned user.";
+    if (empty($title) || empty($description) || empty($status) || empty($deadline) || empty($assigned_to)) {
+        $error = "All fields are required.";
     } else {
         try {
-            $stmt = $conn->prepare("UPDATE tasks SET title = ?, description = ?, assigned_to = ?, status = ?, deadline = ? WHERE id = ?");
-            $stmt->execute([$title, $description, $assigned_to, $status, $deadline, $task_id]);
+            $stmt = $conn->prepare("UPDATE tasks SET title = ?, description = ?, status = ?, deadline = ?, assigned_to = ? WHERE id = ?");
+            $stmt->execute([$title, $description, $status, $deadline, $assigned_to, $task_id]);
+            $success = "Task updated successfully.";
 
-            // Send notification if reassigned
-            if ($task['assigned_to'] != $assigned_to) {
-                $user_stmt = $conn->prepare("SELECT email, username FROM users WHERE id = ?");
-                $user_stmt->execute([$assigned_to]);
-                $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
-
+            if ($assigned_to != $original_assigned_to) {
+                $stmt = $conn->prepare("SELECT username FROM users WHERE id = ?");
+                $stmt->execute([$assigned_to]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($user) {
-                    $to = $user['email'];
-                    $subject = "Task Reassigned: $title";
-                    $message = "Dear {$user['username']},\n\nA task has been reassigned to you.\n\nTitle: $title\nDescription: $description\nDeadline: $deadline";
+                    $message = "New task: $title assigned to you.";
+                    error_log("Creating notification for user_id: $assigned_to, message: $message", 3, '/tmp/debug.log');
+                    try {
+                        $stmt = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
+                        $stmt->execute([$assigned_to, $message]);
+                        error_log("Notification inserted for user_id: $assigned_to", 3, '/tmp/debug.log');
+                    } catch (PDOException $e) {
+                        error_log("Failed to insert notification: " . $e->getMessage(), 3, '/tmp/debug.log');
+                    }
 
-                    if ($is_local) {
-                        error_log("Email notification (local):\n$message\n\n", 3, "/tmp/mail.log");
-                        $success = "Task updated successfully. Email logged to /tmp/mail.log.";
-                    } else {
-                        $mail = new PHPMailer(true);
+                    $phpmailer_path = 'includes/PHPMailer/src/PHPMailer.php';
+                    if (file_exists($phpmailer_path)) {
+                        require_once $phpmailer_path;
+                        require_once 'includes/PHPMailer/src/SMTP.php';
+                        require_once 'includes/PHPMailer/src/Exception.php';
+
+                        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
                         try {
                             $mail->isSMTP();
-                            $mail->Host = 'smtp.mailtrap.io'; // Replace with real SMTP
+                            $mail->Host = 'smtp.mailtrap.io';
                             $mail->SMTPAuth = true;
                             $mail->Username = 'your_mailtrap_username';
                             $mail->Password = 'your_mailtrap_password';
+                            $mail->SMTPSecure = 'tls';
                             $mail->Port = 587;
-                            $mail->setFrom('no-reply@taskmanager.com', 'Task Manager');
-                            $mail->addAddress($to);
-                            $mail->Subject = $subject;
-                            $mail->Body = $message;
-                            $mail->send();
-                            $success = "Task updated and email sent.";
+
+                            $stmt = $conn->prepare("SELECT email, username FROM users WHERE id = ?");
+                            $stmt->execute([$assigned_to]);
+                            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                            if ($user) {
+                                $mail->setFrom('no-reply@taskmanager.com', 'Task Manager');
+                                $mail->addAddress($user['email'], $user['username']);
+                                $mail->Subject = 'Task Assignment Update';
+                                $mail->Body = "Dear {$user['username']},\n\nYou have been assigned a task: {$title}\nDescription: {$description}\nDeadline: {$deadline}\n\nPlease check the Task Management System for details.";
+                                $mail->send();
+                                $success .= " Email notification sent to {$user['username']}.";
+                            }
                         } catch (Exception $e) {
-                            error_log("PHPMailer Error: {$mail->ErrorInfo}");
-                            $error = "Task updated, but email notification failed.";
+                            error_log("PHPMailer Error: {$mail->ErrorInfo}", 3, '/tmp/mail.log');
+                            $error = "Task updated, but failed to send email notification.";
                         }
+                    } else {
+                        error_log("PHPMailer not found at $phpmailer_path", 3, '/tmp/mail.log');
+                        $error = "Task updated, but email notification failed due to missing PHPMailer.";
                     }
+                } else {
+                    error_log("User not found for user_id: $assigned_to", 3, '/tmp/debug.log');
                 }
             } else {
-                $success = "Task updated successfully.";
+                error_log("No notification created: assigned_to ($assigned_to) same as original_assigned_to ($original_assigned_to)", 3, '/tmp/debug.log');
             }
-
-            $_SESSION['success'] = $success;
-            $_SESSION['error'] = $error;
-            header("Location: dashboard.php");
-            exit;
-
         } catch (PDOException $e) {
-            $error = "Database error: " . $e->getMessage();
+            $error = "Error updating task: " . $e->getMessage();
+            error_log("Task update error: " . $e->getMessage(), 3, '/tmp/debug.log');
         }
     }
 }
-?>
 
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Edit Task</title>
-    <link rel="stylesheet" href="css/style.css?v=4">
+    <link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
     <div class="container">
         <h2>Edit Task</h2>
-
         <?php if ($error): ?>
             <p class="error"><?php echo htmlspecialchars($error); ?></p>
         <?php endif; ?>
         <?php if ($success): ?>
             <p class="success"><?php echo htmlspecialchars($success); ?></p>
         <?php endif; ?>
-
-        <form method="POST" action="">
-            <input type="text" name="title" value="<?php echo htmlspecialchars($task['title']); ?>" placeholder="Task Title" required>
-            <textarea name="description" placeholder="Description"><?php echo htmlspecialchars($task['description']); ?></textarea>
-            <select name="assigned_to" required>
-                <option value="">Select User</option>
-                <?php foreach ($users as $user): ?>
-                <option value="<?php echo $user['id']; ?>" <?php echo ($user['id'] == $task['assigned_to']) ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars($user['username']); ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
+        <form method="POST">
+            <input type="text" name="title" placeholder="Task Title" value="<?php echo htmlspecialchars($task['title']); ?>" required>
+            <textarea name="description" placeholder="Task Description" required><?php echo htmlspecialchars($task['description']); ?></textarea>
             <select name="status" required>
-                <option value="Pending" <?php echo ($task['status'] == 'Pending') ? 'selected' : ''; ?>>Pending</option>
-                <option value="In Progress" <?php echo ($task['status'] == 'In Progress') ? 'selected' : ''; ?>>In Progress</option>
-                <option value="Completed" <?php echo ($task['status'] == 'Completed') ? 'selected' : ''; ?>>Completed</option>
+                <option value="Pending" <?php echo $task['status'] == 'Pending' ? 'selected' : ''; ?>>Pending</option>
+                <option value="In Progress" <?php echo $task['status'] == 'In Progress' ? 'selected' : ''; ?>>In Progress</option>
+                <option value="Completed" <?php echo $task['status'] == 'Completed' ? 'selected' : ''; ?>>Completed</option>
             </select>
             <input type="date" name="deadline" value="<?php echo htmlspecialchars($task['deadline']); ?>" required>
-            <button type="submit">Save Changes</button>
+            <select name="assigned_to" required>
+                <?php foreach ($users as $user): ?>
+                    <option value="<?php echo $user['id']; ?>" <?php echo $task['assigned_to'] == $user['id'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($user['username']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit">Update Task</button>
         </form>
-
-        <a href="dashboard.php" class="center-link">← Back to Dashboard</a>
+        <a href="dashboard.php" class="center-link">Back to Dashboard</a>
     </div>
 </body>
 </html>
